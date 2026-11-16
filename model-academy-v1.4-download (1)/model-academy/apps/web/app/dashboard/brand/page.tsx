@@ -1,0 +1,10 @@
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { prisma } from '@model-academy/database';
+import { getCurrentUser } from '@/lib/current-user';
+export default async function BrandStudio(){
+ const user=await getCurrentUser(); if(!user) redirect('/sign-in'); if(!user.roles.some(r=>r.role==='BRAND')) redirect('/dashboard');
+ const campaigns=await prisma.casting.findMany({where:{ownerId:user.id},orderBy:{createdAt:'desc'},include:{_count:{select:{applications:true}}}});
+ const published=campaigns.filter(c=>c.status==='PUBLISHED').length;
+ return <><div className="eyebrow">BRAND STUDIO · CAMPAIGN MANAGEMENT</div><h1 className="serif" style={{fontSize:42,fontWeight:500}}>Donner un visage à votre marque.</h1><p className="muted">Préparez des campagnes photo, vidéo, défilé et ambassadeurs avec un brief transparent et des droits d’image clairement définis.</p><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12,margin:'24px 0'}}>{[['Campagnes',campaigns.length],['Publiées',published],['Candidatures',campaigns.reduce((n,c)=>n+c._count.applications,0)]].map(([l,v])=><div className="card" key={String(l)} style={{padding:18}}><div className="eyebrow">{l}</div><div className="serif" style={{fontSize:32}}>{v}</div></div>)}</div><Link href="/dashboard/recruiter" className="btn">Créer une campagne / un casting</Link><h2 className="serif" style={{fontSize:28,marginTop:30}}>Vos campagnes</h2>{campaigns.length===0?<section className="card" style={{padding:24,marginTop:12}}><p className="muted">Votre première campagne apparaîtra ici après sa soumission à la modération.</p></section>:<div style={{display:'grid',gap:10,marginTop:12}}>{campaigns.map(c=><div className="card" key={c.id} style={{padding:16,display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><strong>{c.title}</strong><p className="muted" style={{fontSize:11}}>{c.country}{c.city?` · ${c.city}`:''} · {c.status}</p></div><span className="eyebrow">{c._count.applications} CANDIDATURE(S)</span></div>)}</div>}</>;
+}

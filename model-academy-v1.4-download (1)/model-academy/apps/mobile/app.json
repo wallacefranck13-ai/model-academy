@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "MODEL ACADEMY",
+    "slug": "model-academy",
+    "scheme": "modelacademy",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}

@@ -1,0 +1,138 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") directUrl = env("DIRECT_URL") }
+enum Role { MODEL GUARDIAN TRAINER AGENCY BRAND PHOTOGRAPHER PROVIDER ORGANIZER SPONSOR MODERATOR ADMIN }
+enum AccountStatus { PENDING ACTIVE SUSPENDED DELETED }
+enum ModelLevel { BEGINNER INTERMEDIATE ADVANCED PROFESSIONAL }
+enum SubscriptionStatus { TRIALING ACTIVE PAST_DUE CANCELLED EXPIRED }
+enum PaymentStatus { PENDING SUCCESS FAILED REFUNDED }
+enum CastingStatus { DRAFT PENDING_REVIEW PUBLISHED CLOSED CANCELLED }
+enum ApplicationStatus { SUBMITTED REVIEWING SHORTLISTED INVITED ACCEPTED REJECTED WITHDRAWN }
+enum SponsorOpportunityStatus { DRAFT PENDING_REVIEW PUBLISHED CLOSED CANCELLED }
+enum SponsorApplicationStatus { SUBMITTED REVIEWING SHORTLISTED ACCEPTED REJECTED WITHDRAWN }
+enum Visibility { PRIVATE PUBLIC VERIFIED_BUSINESSES SELECTED_USERS }
+model User { id String @id @default(cuid()) authUserId String? @unique email String? @unique phone String? @unique fullName String country String @default("TG") locale String @default("fr") status AccountStatus @default(PENDING) dateOfBirth DateTime? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt roles UserRole[] modelProfile ModelProfile? subscriptions Subscription[] payments Payment[] notifications Notification[] guardianLinks GuardianLink[] aiConversations AIConversation[] sponsorOpportunities SponsorOpportunity[] conversationsA Conversation[] @relation("ConversationA") conversationsB Conversation[] @relation("ConversationB") sentMessages Message[] }
+model UserRole { id String @id @default(cuid()) userId String role Role user User @relation(fields:[userId],references:[id],onDelete:Cascade) @@unique([userId,role]) }
+model ModelProfile { id String @id @default(cuid()) userId String @unique stage ModelLevel @default(BEGINNER) biography String? @db.Text specialties String[] languages String[] city String? country String @default("TG") isAvailable Boolean @default(true) publicPortfolio Boolean @default(false) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt user User @relation(fields:[userId],references:[id],onDelete:Cascade) portfolio Portfolio? enrollments Enrollment[] applications CastingApplication[] goals CareerGoal[] bookings Booking[] sponsorApplications SponsorApplication[] contracts Contract[] }
+model GuardianLink { id String @id @default(cuid()) guardianId String minorUserId String verifiedAt DateTime? permissions Json createdAt DateTime @default(now()) guardian User @relation(fields:[guardianId],references:[id]) @@unique([guardianId,minorUserId]) }
+model Portfolio { id String @id @default(cuid()) modelId String @unique title String? description String? @db.Text publicSlug String? @unique createdAt DateTime @default(now()) updatedAt DateTime @updatedAt model ModelProfile @relation(fields:[modelId],references:[id],onDelete:Cascade) media PortfolioMedia[] }
+model PortfolioMedia { id String @id @default(cuid()) portfolioId String storageKey String mediaType String visibility Visibility @default(PRIVATE) caption String? createdAt DateTime @default(now()) portfolio Portfolio @relation(fields:[portfolioId],references:[id],onDelete:Cascade) consents MediaConsent[] }
+model MediaConsent { id String @id @default(cuid()) mediaId String purpose String grantedAt DateTime revokedAt DateTime? documentRef String? media PortfolioMedia @relation(fields:[mediaId],references:[id],onDelete:Cascade) }
+model Course { id String @id @default(cuid()) title String slug String @unique description String @db.Text category String level String isPublished Boolean @default(false) createdAt DateTime @default(now()) lessons Lesson[] enrollments Enrollment[] }
+model Lesson { id String @id @default(cuid()) courseId String title String content String? @db.Text videoKey String? position Int duration Int? course Course @relation(fields:[courseId],references:[id],onDelete:Cascade) progress LessonProgress[] }
+model Enrollment { id String @id @default(cuid()) modelId String courseId String enrolledAt DateTime @default(now()) completedAt DateTime? model ModelProfile @relation(fields:[modelId],references:[id]) course Course @relation(fields:[courseId],references:[id]) progress LessonProgress[] @@unique([modelId,courseId]) }
+model LessonProgress { id String @id @default(cuid()) lessonId String enrollmentId String completed Boolean @default(false) score Float? completedAt DateTime? lesson Lesson @relation(fields:[lessonId],references:[id],onDelete:Cascade) enrollment Enrollment @relation(fields:[enrollmentId],references:[id],onDelete:Cascade) @@unique([lessonId,enrollmentId]) }
+model AITrainingSession { id String @id @default(cuid()) userId String sessionType String videoStorageKey String? status String feedback Json? createdAt DateTime @default(now()) @@index([userId,createdAt]) }
+model Casting {
+  id String @id @default(cuid())
+  ownerId String
+  title String
+  description String @db.Text
+  requirements String? @db.Text
+  compensationType String?
+  usageRights String? @db.Text
+  country String
+  city String?
+  budget Decimal? @db.Decimal(12,2)
+  currency String @default("XOF")
+  deadline DateTime?
+  status CastingStatus @default(DRAFT)
+  isVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  applications CastingApplication[]
+  @@index([status, isVerified, deadline])
+  @@index([ownerId, createdAt])
+}
+model CastingApplication { id String @id @default(cuid()) castingId String modelId String status ApplicationStatus @default(SUBMITTED) message String? @db.Text createdAt DateTime @default(now()) casting Casting @relation(fields:[castingId],references:[id]) model ModelProfile @relation(fields:[modelId],references:[id]) conversation Conversation? @@unique([castingId,modelId]) }
+model Contract { id String @id @default(cuid()) modelId String title String terms Json amount Decimal @db.Decimal(12,2) currency String @default("XOF") signedAt DateTime? acceptedAt DateTime? rejectedAt DateTime? status String @default("PROPOSED") createdAt DateTime @default(now()) model ModelProfile @relation(fields:[modelId],references:[id],onDelete:Cascade) @@index([modelId,status]) }
+model CareerGoal { id String @id @default(cuid()) modelId String title String description String? deadline DateTime? completedAt DateTime? model ModelProfile @relation(fields:[modelId],references:[id]) }
+model Booking { id String @id @default(cuid()) modelId String title String startAt DateTime endAt DateTime? location String? status String @default("PROPOSED") respondedAt DateTime? model ModelProfile @relation(fields:[modelId],references:[id],onDelete:Cascade) @@index([modelId,startAt]) }
+model SubscriptionPlan { id String @id @default(cuid()) code String @unique name String price Decimal @db.Decimal(12,2) currency String @default("XOF") interval String features Json isActive Boolean @default(true) subscriptions Subscription[] }
+model Subscription { id String @id @default(cuid()) userId String planId String status SubscriptionStatus startsAt DateTime endsAt DateTime? createdAt DateTime @default(now()) user User @relation(fields:[userId],references:[id]) plan SubscriptionPlan @relation(fields:[planId],references:[id]) }
+model Payment { id String @id @default(cuid()) userId String amount Decimal @db.Decimal(12,2) currency String provider String providerRef String? @unique status PaymentStatus @default(PENDING) idempotencyKey String @unique createdAt DateTime @default(now()) user User @relation(fields:[userId],references:[id]) }
+model Notification { id String @id @default(cuid()) userId String title String message String @db.Text readAt DateTime? createdAt DateTime @default(now()) user User @relation(fields:[userId],references:[id]) }
+
+
+model AIConversation {
+  id        String      @id @default(cuid())
+  userId    String
+  title     String      @default("Nouvelle séance")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AIMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model AIMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  role           String
+  content        String         @db.Text
+  createdAt      DateTime       @default(now())
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+
+model SponsorOpportunity {
+  id String @id @default(cuid())
+  ownerId String
+  title String
+  description String @db.Text
+  supportType String
+  amount Decimal? @db.Decimal(12,2)
+  currency String @default("XOF")
+  country String @default("TG")
+  deadline DateTime?
+  status SponsorOpportunityStatus @default(DRAFT)
+  isVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  applications SponsorApplication[]
+  @@index([status, isVerified, deadline])
+  @@index([ownerId, createdAt])
+}
+
+model SponsorApplication {
+  id String @id @default(cuid())
+  opportunityId String
+  modelId String
+  message String? @db.Text
+  status SponsorApplicationStatus @default(SUBMITTED)
+  createdAt DateTime @default(now())
+  opportunity SponsorOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  model ModelProfile @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  @@unique([opportunityId, modelId])
+  @@index([modelId, createdAt])
+}
+
+
+model Conversation {
+  id String @id @default(cuid())
+  userAId String
+  userBId String
+  castingApplicationId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userA User @relation("ConversationA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("ConversationB", fields: [userBId], references: [id], onDelete: Cascade)
+  castingApplication CastingApplication? @relation(fields: [castingApplicationId], references: [id], onDelete: SetNull)
+  messages Message[]
+  @@index([userAId, updatedAt])
+  @@index([userBId, updatedAt])
+}
+
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  senderId String
+  body String @db.VarChar(2000)
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+}
